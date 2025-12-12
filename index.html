@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Spider Slicer: High Capacity</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Roboto Mono', monospace;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        /* --- HUD --- */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            min-width: 150px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+        }
+
+        .stat-value {
+            font-family: 'Black Ops One', cursive;
+            font-size: 32px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        /* Danger Bar */
+        #danger-container {
+            width: 100%;
+            height: 10px;
+            background: #333;
+            margin-top: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid #555;
+            position: relative;
+        }
+        #danger-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            transition: width 0.2s linear;
+        }
+        
+        #capacity-text {
+            font-size: 10px;
+            color: #fff;
+            text-align: right;
+            margin-top: 2px;
+        }
+
+        /* --- Overlays --- */
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        h1 {
+            font-family: 'Black Ops One', cursive;
+            font-size: 5rem;
+            color: white;
+            margin: 0;
+            text-transform: uppercase;
+            background: linear-gradient(to right, #00ffcc, #ff00ff, #ffff00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+            text-align: center;
+            line-height: 1;
+        }
+
+        p {
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        button {
+            padding: 20px 60px;
+            font-size: 24px;
+            font-family: 'Black Ops One', cursive;
+            background: #fff;
+            color: #000;
+            border: none;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Floating Combo Text */
+        .floating-text {
+            position: absolute;
+            font-family: 'Black Ops One', cursive;
+            color: #fff;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            font-size: 40px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+        }
+        
+        #slow-mo-vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 100px 50px rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            display: none;
+            mix-blend-mode: overlay;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="top-bar">
+            <div class="stat-box" style="border-color: #00ffcc;">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score-val" style="color:#00ffcc">0</div>
+            </div>
+            <div class="stat-box" style="border-color: #ff3333;">
+                <div class="stat-label">System Load</div>
+                <div id="danger-container">
+                    <div id="danger-fill"></div>
+                </div>
+                <div id="capacity-text">0 / 20</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>NEON<br>SLICER</h1>
+        <p>Drag to Slice Webs.<br>System Capacity Increased to 20!</p>
+        <button onclick="Game.init()">START GAME</button>
+    </div>
+
+    <div id="game-over-screen" style="display:none;">
+        <h1 style="background:none; -webkit-text-fill-color: #ff3333;">SYSTEM<br>CRASH</h1>
+        <p>Final Score: <span id="final-score" style="color:white; font-weight:bold;">0</span></p>
+        <button onclick="Game.init()">REBOOT</button>
+    </div>
+
+    <div id="slow-mo-vignette"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioSys = {
+            ctx: null,
+            init: function() {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            },
+            play: function(type) {
+                if(!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                if (type === 'slash') {
+                    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+                    osc.type = 'triangle';
+                } else if (type === 'hit') {
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                    osc.type = 'sawtooth';
+                } else if (type === 'powerup') {
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(1200, this.ctx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+                    osc.type = 'sine';
+                }
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            }
+        };
+
+        // --- GAME ENGINE ---
+        const Game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: document.getElementById('gameCanvas').getContext('2d'),
+            width: 0,
+            height: 0,
+            loopId: null,
+            lastTime: 0,
+            
+            // State
+            active: false,
+            score: 0,
+            timeScale: 1.0, 
+            slowMoTimer: 0,
+            shake: 0,
+            
+            // Settings
+            maxWebs: 20, // INCREASED CAPACITY HERE
+            
+            // Entities
+            webs: [],
+            particles: [],
+            powerups: [],
+            slashTrail: [],
+            
+            // Input
+            mouse: { x: 0, y: 0 },
+            isDown: false,
+
+            init: function() {
+                AudioSys.init();
+                this.active = true;
+                this.score = 0;
+                this.webs = [];
+                this.particles = [];
+                this.powerups = [];
+                this.timeScale = 1.0;
+                
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('game-over-screen').style.display = 'none';
+                document.getElementById('score-val').innerText = '0';
+                
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                this.bindInput();
+                this.lastTime = performance.now();
+                
+                // Start Loop
+                if(this.loopId) cancelAnimationFrame(this.loopId);
+                this.loop(performance.now());
+            },
+
+            resize: function() {
+                this.width = this.canvas.width = window.innerWidth;
+                this.height = this.canvas.height = window.innerHeight;
+            },
+
+            bindInput: function() {
+                const start = (e) => { this.isDown = true; this.slashTrail = []; this.move(e); };
+                const end = () => { this.isDown = false; };
+                const move = (e) => {
+                    const x = e.touches ? e.touches[0].clientX : e.clientX;
+                    const y = e.touches ? e.touches[0].clientY : e.clientY;
+                    this.mouse = {x, y};
+                    if(this.isDown) {
+                        this.slashTrail.push({x, y});
+                        if(this.slashTrail.length > 8) this.slashTrail.shift();
+                        this.checkCollisions(x, y);
+                    }
+                };
+
+                window.addEventListener('mousedown', start);
+                window.addEventListener('mousemove', move);
+                window.addEventListener('mouseup', end);
+                window.addEventListener('touchstart', start, {passive: false});
+                window.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); }, {passive: false});
+                window.addEventListener('touchend', end);
+            },
+
+            spawnLogic: function(dt) {
+                // Adaptive difficulty
+                let rate = 0.02 + (this.score / 50000); 
+                
+                if(Math.random() < rate * this.timeScale) {
+                    this.webs.push(new Web(this.width, this.height));
+                }
+                
+                // Powerup
+                if(Math.random() < 0.001 * this.timeScale) {
+                    this.powerups.push(new PowerUp(this.width, this.height));
+                }
+            },
+
+            checkCollisions: function(x, y) {
+                if(Math.random() > 0.8) AudioSys.play('slash');
+
+                for(let i = this.webs.length - 1; i >= 0; i--) {
+                    const w = this.webs[i];
+                    const dist = Math.hypot(x - w.x, y - w.y);
+                    if(dist < w.radius + 20) {
+                        w.hp--;
+                        this.createParticles(w.x, w.y, w.color, 5);
+                        this.shake = 5;
+                        AudioSys.play('hit');
+                        
+                        if(w.hp <= 0) {
+                            this.webs.splice(i, 1);
+                            let pts = w.isBoss ? 100 : 10;
+                            this.score += pts;
+                            this.createFloatingText(x, y, `+${pts}`, w.color);
+                            this.createParticles(w.x, w.y, w.color, 20);
+                            document.getElementById('score-val').innerText = this.score;
+                        }
+                    }
+                }
+
+                for(let i = this.powerups.length - 1; i >= 0; i--) {
+                    const p = this.powerups[i];
+                    const dist = Math.hypot(x - p.x, y - p.y);
+                    if(dist < p.radius + 20) {
+                        this.powerups.splice(i, 1);
+                        this.activateSlowMo();
+                    }
+                }
+            },
+
+            activateSlowMo: function() {
+                this.timeScale = 0.2;
+                this.slowMoTimer = 5.0; 
+                AudioSys.play('powerup');
+                document.getElementById('slow-mo-vignette').style.display = 'block';
+                this.createFloatingText(this.width/2, this.height/2, "SLOW MO!", "#fff");
+            },
+
+            createParticles: function(x, y, color, count) {
+                for(let i=0; i<count; i++) {
+                    this.particles.push(new Particle(x, y, color));
+                }
+            },
+
+            createFloatingText: function(x, y, text, color) {
+                const el = document.createElement('div');
+                el.className = 'floating-text';
+                el.innerText = text;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                el.style.color = color || '#fff';
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 800);
+            },
+
+            gameOver: function() {
+                this.active = false;
+                document.getElementById('game-over-screen').style.display = 'flex';
+                document.getElementById('final-score').innerText = this.score;
+                document.getElementById('slow-mo-vignette').style.display = 'none';
+            },
+
+            loop: function(now) {
+                if(!this.active) return;
+                const dt = (now - this.lastTime) / 1000;
+                this.lastTime = now;
+
+                if(this.slowMoTimer > 0) {
+                    this.slowMoTimer -= dt;
+                    if(this.slowMoTimer <= 0) {
+                        this.timeScale = 1.0;
+                        document.getElementById('slow-mo-vignette').style.display = 'none';
+                    }
+                }
+
+                this.spawnLogic(dt);
+                this.updateEntities(dt);
+                this.draw();
+
+                // UPDATE DANGER METER (Based on 20 capacity)
+                const danger = Math.min((this.webs.length / this.maxWebs) * 100, 100);
+                document.getElementById('danger-fill').style.width = danger + '%';
+                document.getElementById('capacity-text').innerText = this.webs.length + " / " + this.maxWebs;
+                
+                if(this.webs.length >= this.maxWebs) this.gameOver();
+
+                this.loopId = requestAnimationFrame((t) => this.loop(t));
+            },
+
+            updateEntities: function(dt) {
+                const timeStep = dt * this.timeScale;
+                this.webs.forEach(w => w.update(timeStep));
+                this.powerups.forEach(p => p.update(timeStep));
+                for(let i=this.particles.length-1; i>=0; i--) {
+                    const p = this.particles[i];
+                    p.update(dt); 
+                    if(p.life <= 0) this.particles.splice(i, 1);
+                }
+                if(this.shake > 0) this.shake *= 0.9;
+            },
+
+            draw: function() {
+                this.ctx.fillStyle = '#050505';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+                
+                this.drawGrid();
+
+                this.ctx.save();
+                if(this.shake > 0.5) {
+                    this.ctx.translate((Math.random()-0.5)*this.shake, (Math.random()-0.5)*this.shake);
+                }
+
+                this.webs.forEach(w => w.draw(this.ctx));
+                this.powerups.forEach(p => p.draw(this.ctx));
+                this.particles.forEach(p => p.draw(this.ctx));
+
+                if(this.isDown && this.slashTrail.length > 1) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.slashTrail[0].x, this.slashTrail[0].y);
+                    for(let i=1; i<this.slashTrail.length; i++) {
+                        this.ctx.lineTo(this.slashTrail[i].x, this.slashTrail[i].y);
+                    }
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 4;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    this.ctx.shadowBlur = 15;
+                    this.ctx.shadowColor = '#fff';
+                    this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                }
+
+                this.ctx.restore();
+            },
+
+            drawGrid: function() {
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+                this.ctx.lineWidth = 1;
+                const time = Date.now() / 50;
+                const gridSize = 60;
+                const offset = time % gridSize;
+                
+                this.ctx.beginPath();
+                for(let x = 0; x < this.width; x += gridSize) {
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                }
+                for(let y = offset; y < this.height; y += gridSize) {
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.width, y);
+                }
+                this.ctx.stroke();
+            }
+        };
+
+        // --- ENTITIES ---
+        
+        class Web {
+            constructor(w, h) {
+                this.x = Math.random() * (w - 100) + 50;
+                this.y = Math.random() * (h - 100) + 50;
+                this.maxRadius = 50 + Math.random() * 40;
+                this.radius = 0;
+                this.growthRate = 40;
+                this.isBoss = Math.random() < 0.05; 
+                this.rotation = Math.random() * Math.PI;
+                
+                // MULTI-COLOR LOGIC
+                const colors = [
+                    '#00ffcc', // Cyan
+                    '#ff00ff', // Magenta
+                    '#ccff00', // Lime
+                    '#ffff00', // Yellow
+                    '#00ccff', // Sky Blue
+                    '#ff9900'  // Orange
+                ];
+
+                if(this.isBoss) {
+                    this.maxRadius = 140;
+                    this.hp = 5;
+                    this.color = '#ff0000'; // Boss is Red
+                } else {
+                    this.hp = 1;
+                    this.color = colors[Math.floor(Math.random() * colors.length)];
+                }
+            }
+            update(dt) {
+                if(this.radius < this.maxRadius) this.radius += this.growthRate * dt;
+                this.rotation += dt * 0.5;
+            }
+            draw(ctx) {
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.isBoss ? 4 : 2;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                
+                ctx.beginPath();
+                // Spikes
+                for(let i=0; i<8; i++) {
+                    const angle = (Math.PI*2/8)*i;
+                    ctx.moveTo(0,0);
+                    ctx.lineTo(Math.cos(angle)*this.radius, Math.sin(angle)*this.radius);
+                }
+                // Spiral
+                for(let r=this.radius/4; r<=this.radius; r+=this.radius/4) {
+                    ctx.moveTo(r, 0);
+                    ctx.arc(0, 0, r, 0, Math.PI*2);
+                }
+                ctx.stroke();
+                
+                // Boss HP Text
+                if(this.isBoss) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = '24px "Black Ops One"';
+                    ctx.fillText(this.hp, -7, 8);
+                }
+                
+                ctx.shadowBlur = 0;
+                ctx.rotate(-this.rotation);
+                ctx.translate(-this.x, -this.y);
+            }
+        }
+
+        class PowerUp {
+            constructor(w, h) {
+                this.x = Math.random() * (w - 60) + 30;
+                this.y = Math.random() * (h - 60) + 30;
+                this.radius = 25;
+                this.life = 5.0; 
+            }
+            update(dt) {
+                this.life -= dt;
+                if(this.life <= 0) this.x = -1000; 
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.abs(Math.sin(Date.now()/200)) * 0.5})`;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#fff';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("SLOW", 0, 4);
+                
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 200 + 50;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.gravity = 500;
+            }
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.vy += this.gravity * dt;
+                this.life -= dt * 2.5;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        window.addEventListener('resize', () => Game.resize());
+
+    </script>
+</body>
+</html>
