@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <title>Neon Spider Slicer</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@400;700&display=swap');
@@ -47,7 +48,6 @@
             padding: 10px 20px;
             border-radius: 8px;
             backdrop-filter: blur(5px);
-            min-width: 150px;
         }
 
         .stat-label {
@@ -74,20 +74,12 @@
             border-radius: 5px;
             overflow: hidden;
             border: 1px solid #555;
-            position: relative;
         }
         #danger-fill {
             height: 100%;
             width: 0%;
-            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            background: linear-gradient(90deg, #00ff00, #ff0000);
             transition: width 0.2s linear;
-        }
-        
-        #capacity-text {
-            font-size: 10px;
-            color: #fff;
-            text-align: right;
-            margin-top: 2px;
         }
 
         /* --- Overlays --- */
@@ -183,21 +175,20 @@
                 <div id="danger-container">
                     <div id="danger-fill"></div>
                 </div>
-                <div id="capacity-text">0 / 20</div>
             </div>
         </div>
     </div>
 
     <div id="start-screen">
         <h1>NEON<br>SLICER</h1>
-        <p>A 3d animated gmae.<br> Yadav </p>
+        <p>Hi GIve Your Best score on<br><a href="https://www.youtube.com/@Amardeep-rn3mv" target="main"><i class="fa-brands fa-youtube"></i></a></p>
         <button onclick="Game.init()">START GAME</button>
     </div>
 
     <div id="game-over-screen" style="display:none;">
-        <h1 style="background:none; -webkit-text-fill-color: #ff3333;">SYSTEM<br>CRASH</h1>
+        <h1 style="background:none; -webkit-text-fill-color: #ff3333;">GAME<br>OVER</h1>
         <p>Final Score: <span id="final-score" style="color:white; font-weight:bold;">0</span></p>
-        <button onclick="Game.init()">REBOOT</button>
+        <button onclick="Game.init()">RETRY</button>
     </div>
 
     <div id="slow-mo-vignette"></div>
@@ -258,9 +249,7 @@
             timeScale: 1.0, 
             slowMoTimer: 0,
             shake: 0,
-            
-            // Settings
-            maxWebs: 10, // INCREASED CAPACITY HERE
+            spawnTimer: 0,
             
             // Entities
             webs: [],
@@ -324,7 +313,7 @@
             },
 
             spawnLogic: function(dt) {
-                // Adaptive difficulty
+                // Adaptive difficulty spawn rate
                 let rate = 0.02 + (this.score / 50000); 
                 
                 if(Math.random() < rate * this.timeScale) {
@@ -343,7 +332,7 @@
                 for(let i = this.webs.length - 1; i >= 0; i--) {
                     const w = this.webs[i];
                     const dist = Math.hypot(x - w.x, y - w.y);
-                    if(dist < w.radius + 10) {
+                    if(dist < w.radius + 20) {
                         w.hp--;
                         this.createParticles(w.x, w.y, w.color, 5);
                         this.shake = 5;
@@ -363,7 +352,7 @@
                 for(let i = this.powerups.length - 1; i >= 0; i--) {
                     const p = this.powerups[i];
                     const dist = Math.hypot(x - p.x, y - p.y);
-                    if(dist < p.radius + 10) {
+                    if(dist < p.radius + 20) {
                         this.powerups.splice(i, 1);
                         this.activateSlowMo();
                     }
@@ -419,12 +408,9 @@
                 this.updateEntities(dt);
                 this.draw();
 
-                // UPDATE DANGER METER (Based on 20 capacity)
-                const danger = Math.min((this.webs.length / this.maxWebs) * 100, 100);
+                const danger = Math.min((this.webs.length / 10) * 100, 100);
                 document.getElementById('danger-fill').style.width = danger + '%';
-                document.getElementById('capacity-text').innerText = this.webs.length + " / " + this.maxWebs;
-                
-                if(this.webs.length >= this.maxWebs) this.gameOver();
+                if(this.webs.length >= 10) this.gameOver();
 
                 this.loopId = requestAnimationFrame((t) => this.loop(t));
             },
@@ -508,6 +494,7 @@
                 this.rotation = Math.random() * Math.PI;
                 
                 // MULTI-COLOR LOGIC
+                // Neon Pallete
                 const colors = [
                     '#00ffcc', // Cyan
                     '#ff00ff', // Magenta
@@ -520,9 +507,10 @@
                 if(this.isBoss) {
                     this.maxRadius = 140;
                     this.hp = 5;
-                    this.color = '#ff0000'; // Boss is Red
+                    this.color = '#ff0000'; // Boss is always Red
                 } else {
                     this.hp = 1;
+                    // Pick Random Color
                     this.color = colors[Math.floor(Math.random() * colors.length)];
                 }
             }
@@ -631,6 +619,4 @@
 
     </script>
 </body>
-
 </html>
-
