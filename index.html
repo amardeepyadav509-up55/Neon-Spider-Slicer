@@ -260,7 +260,7 @@
             shake: 0,
             
             // Settings
-            maxWebs: 20, // INCREASED CAPACITY HERE
+            maxWebs: 10, // INCREASED CAPACITY HERE
             
             // Entities
             webs: [],
@@ -343,7 +343,7 @@
                 for(let i = this.webs.length - 1; i >= 0; i--) {
                     const w = this.webs[i];
                     const dist = Math.hypot(x - w.x, y - w.y);
-                    if(dist < w.radius + 20) {
+                    if(dist < w.radius + 10) {
                         w.hp--;
                         this.createParticles(w.x, w.y, w.color, 5);
                         this.shake = 5;
@@ -363,7 +363,7 @@
                 for(let i = this.powerups.length - 1; i >= 0; i--) {
                     const p = this.powerups[i];
                     const dist = Math.hypot(x - p.x, y - p.y);
-                    if(dist < p.radius + 20) {
+                    if(dist < p.radius + 10) {
                         this.powerups.splice(i, 1);
                         this.activateSlowMo();
                     }
@@ -633,3 +633,4 @@
 </body>
 
 </html>
+
